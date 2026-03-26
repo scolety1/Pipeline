@@ -1,6 +1,5 @@
-import { auth, db } from "./firebase-config.js";
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
-
+import { db } from "./firebase-config.js";
+import { waitForUser } from "./protected-page.js";
 import {
   collection,
   addDoc,
@@ -11,40 +10,6 @@ import {
   orderBy,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
-
-const state = {
-  contacts: [],
-  filteredContacts: [],
-  currentUser: null,
-  editingContactId: null
-};
-
-onAuthStateChanged(auth, async (user) => {
-  if (!user) {
-    console.log("No user signed in");
-    window.location.replace("login.html");
-    return;
-  }
-
-  currentUser = user;
-
-  if (userNameEl) {
-    userNameEl.textContent =
-      user.displayName?.trim() || user.email?.split("@")[0] || "User";
-  }
-
-  if (userEmailEl) {
-    userEmailEl.textContent = user.email || "";
-  }
-
-  await loadApplications();
-  await loadSavedDrafts();
-});
-
-
-const userNameEl = document.getElementById("userName");
-const userEmailEl = document.getElementById("userEmail");
-const logoutBtn = document.getElementById("logoutBtn");
 
 const els = {
   contactsGrid: document.getElementById("contactsGrid"),
@@ -89,8 +54,19 @@ const els = {
   notes: document.getElementById("notes")
 };
 
-function getContactsCollectionRef(uid) {
-  return collection(db, "users", uid, "contacts");
+const state = {
+  user: null,
+  contacts: [],
+  filteredContacts: [],
+  editingContactId: null
+};
+
+function getContactsRef() {
+  return collection(db, "users", state.user.uid, "contacts");
+}
+
+function getContactDocRef(contactId) {
+  return doc(db, "users", state.user.uid, "contacts", contactId);
 }
 
 function toDateInputValue(value) {
@@ -100,14 +76,11 @@ function toDateInputValue(value) {
   return date.toISOString().split("T")[0];
 }
 
-function toDateStringOrNull(value) {
-  return value ? value : "";
-}
-
 function formatDate(value) {
   if (!value) return "—";
   const date = value?.toDate ? value.toDate() : new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
+
   return date.toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
@@ -115,20 +88,20 @@ function formatDate(value) {
   });
 }
 
-function getInitials(name = "") {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0][0].toUpperCase();
-  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-}
-
 function escapeHtml(str = "") {
-  return str
+  return String(str)
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function getInitials(name = "") {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 }
 
 function getStatusBadgeClass(status = "") {
@@ -145,244 +118,57 @@ function getStatusLabel(status = "") {
 
 function truncateText(text = "", maxLength = 140) {
   if (!text) return "No notes yet.";
-  if (text.length <= maxLength) return text;
-  return `${text.slice(0, maxLength).trim()}...`;
+  return text.length > maxLength ? `${text.slice(0, maxLength)}…` : text;
 }
 
-function isSameMonth(dateA, dateB) {
-  return (
-    dateA.getFullYear() === dateB.getFullYear() &&
-    dateA.getMonth() === dateB.getMonth()
-  );
-}
-
-function normalizeString(value = "") {
-  return value.trim().toLowerCase();
-}
-
-function parseCommaSeparatedIds(value = "") {
-  return value
+function getNormalizedRelatedIds(rawValue = "") {
+  return rawValue
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
 }
 
-function buildContactCard(contact) {
-  const name = escapeHtml(contact.fullName || "Unnamed Contact");
-  const relationship = escapeHtml(contact.relationship || "No relationship");
-  const company = escapeHtml(contact.company || "No company");
-  const role = escapeHtml(contact.role || "No title");
-  const email = escapeHtml(contact.email || "—");
-  const phone = escapeHtml(contact.phone || "—");
-  const source = escapeHtml(contact.source || "—");
-  const notes = escapeHtml(truncateText(contact.notes || ""));
-  const initials = escapeHtml(getInitials(contact.fullName || ""));
-  const relatedCount = Array.isArray(contact.relatedOpportunityIds)
-    ? contact.relatedOpportunityIds.length
-    : 0;
+function isFollowUpNeeded(value) {
+  if (!value) return false;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
 
-  return `
-    <article class="contact-card" data-id="${contact.id}">
-      <div class="contact-top">
-        <div class="contact-main">
-          <div class="avatar">${initials}</div>
-          <div class="contact-name-block">
-            <h3 class="contact-name">${name}</h3>
-            <p class="contact-role">
-              ${role} <span class="contact-company">@ ${company}</span>
-            </p>
-          </div>
-        </div>
-
-        <div class="contact-actions">
-          <button class="icon-btn edit-contact-btn" data-id="${contact.id}" aria-label="Edit contact">✎</button>
-        </div>
-      </div>
-
-      <div class="contact-badges">
-        <span class="badge">${relationship}</span>
-        <span class="badge ${getStatusBadgeClass(contact.status)}">
-          ${getStatusLabel(contact.status)}
-        </span>
-      </div>
-
-      <div class="contact-meta">
-        <div class="meta-card">
-          <span class="meta-label">Last Contacted</span>
-          <span class="meta-value">${formatDate(contact.lastContactedAt)}</span>
-        </div>
-
-        <div class="meta-card">
-          <span class="meta-label">Next Follow-Up</span>
-          <span class="meta-value">${formatDate(contact.nextFollowUpAt)}</span>
-        </div>
-
-        <div class="meta-card">
-          <span class="meta-label">Email</span>
-          <span class="meta-value">${email}</span>
-        </div>
-
-        <div class="meta-card">
-          <span class="meta-label">Source</span>
-          <span class="meta-value">${source}</span>
-        </div>
-      </div>
-
-      <div class="contact-notes">
-        <span class="notes-label">Notes</span>
-        <p class="notes-text">${notes}</p>
-      </div>
-
-      <div class="contact-footer">
-        <div class="related-pill">
-          Related opportunities: ${relatedCount}
-        </div>
-        <div class="meta-value">${phone !== "—" ? phone : ""}</div>
-      </div>
-    </article>
-  `;
+  const today = new Date();
+  const localToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  return date <= localToday;
 }
 
-function renderContacts() {
-  if (state.filteredContacts.length === 0) {
-    els.contactsGrid.innerHTML = "";
-    els.emptyState.classList.remove("hidden");
-    return;
-  }
+function openDrawer(isEditing = false) {
+  els.contactDrawer.classList.add("open");
+  els.contactDrawer.setAttribute("aria-hidden", "false");
+  els.drawerBackdrop.classList.remove("hidden");
+  document.body.classList.add("drawer-open");
 
-  els.emptyState.classList.add("hidden");
-  els.contactsGrid.innerHTML = state.filteredContacts.map(buildContactCard).join("");
-
-  document.querySelectorAll(".edit-contact-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const id = btn.dataset.id;
-      const contact = state.contacts.find((item) => item.id === id);
-      if (contact) openDrawer(contact);
-    });
-  });
+  els.drawerEyebrow.textContent = isEditing ? "Edit Contact" : "New Contact";
+  els.drawerTitle.textContent = isEditing ? "Update Contact" : "Add Contact";
+  els.archiveContactBtn.classList.toggle("hidden", !isEditing);
 }
 
-function renderStats() {
-  const activeContacts = state.contacts.filter((c) => !c.archived);
-  const now = new Date();
-
-  const activeThisMonth = activeContacts.filter((contact) => {
-    if (!contact.lastContactedAt) return false;
-    const date = contact.lastContactedAt.toDate();
-    return isSameMonth(date, now);
-  }).length;
-
-  const needFollowUp = activeContacts.filter((contact) => {
-    if (!contact.nextFollowUpAt) return false;
-    const followUpDate = contact.nextFollowUpAt.toDate();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    return followUpDate <= today;
-  }).length;
-
-  const companies = new Set(
-    activeContacts
-      .map((c) => (c.company || "").trim())
-      .filter(Boolean)
-      .map((c) => c.toLowerCase())
-  );
-
-  els.totalContactsStat.textContent = activeContacts.length;
-  els.activeThisMonthStat.textContent = activeThisMonth;
-  els.needFollowUpStat.textContent = needFollowUp;
-  els.companiesRepresentedStat.textContent = companies.size;
-}
-
-function renderRelationshipFilterOptions() {
-  const currentValue = els.relationshipFilter.value;
-  const relationships = Array.from(
-    new Set(
-      state.contacts
-        .filter((c) => !c.archived)
-        .map((c) => (c.relationship || "").trim())
-        .filter(Boolean)
-    )
-  ).sort((a, b) => a.localeCompare(b));
-
-  els.relationshipFilter.innerHTML = `
-    <option value="all">All relationships</option>
-    ${relationships.map((rel) => `<option value="${escapeHtml(rel)}">${escapeHtml(rel)}</option>`).join("")}
-  `;
-
-  if (relationships.includes(currentValue)) {
-    els.relationshipFilter.value = currentValue;
-  } else {
-    els.relationshipFilter.value = "all";
-  }
-}
-
-function applyFilters() {
-  const search = normalizeString(els.searchInput.value);
-  const relationship = els.relationshipFilter.value;
-  const status = els.statusFilter.value;
-  const sort = els.sortSelect.value;
-
-  let results = state.contacts.filter((contact) => !contact.archived);
-
-  if (search) {
-    results = results.filter((contact) => {
-      const haystack = [
-        contact.fullName || "",
-        contact.company || "",
-        contact.role || "",
-        contact.email || ""
-      ]
-        .join(" ")
-        .toLowerCase();
-
-      return haystack.includes(search);
-    });
-  }
-
-  if (relationship !== "all") {
-    results = results.filter(
-      (contact) => (contact.relationship || "").trim() === relationship
-    );
-  }
-
-  if (status !== "all") {
-    results = results.filter((contact) => (contact.status || "cold") === status);
-  }
-
-  results.sort((a, b) => {
-    if (sort === "nameAZ") {
-      return (a.fullName || "").localeCompare(b.fullName || "");
-    }
-
-    if (sort === "lastContacted") {
-      const aTime = a.lastContactedAt?.toDate?.().getTime?.() || 0;
-      const bTime = b.lastContactedAt?.toDate?.().getTime?.() || 0;
-      return bTime - aTime;
-    }
-
-    if (sort === "followUpSoon") {
-      const aTime = a.nextFollowUpAt?.toDate?.().getTime?.() || Number.MAX_SAFE_INTEGER;
-      const bTime = b.nextFollowUpAt?.toDate?.().getTime?.() || Number.MAX_SAFE_INTEGER;
-      return aTime - bTime;
-    }
-
-    const aTime = a.createdAt?.toDate?.().getTime?.() || 0;
-    const bTime = b.createdAt?.toDate?.().getTime?.() || 0;
-    return bTime - aTime;
-  });
-
-  state.filteredContacts = results;
-  renderContacts();
+function closeDrawer() {
+  els.contactDrawer.classList.remove("open");
+  els.contactDrawer.setAttribute("aria-hidden", "true");
+  els.drawerBackdrop.classList.add("hidden");
+  document.body.classList.remove("drawer-open");
+  resetForm();
 }
 
 function resetForm() {
+  state.editingContactId = null;
   els.contactForm.reset();
   els.contactId.value = "";
-  state.editingContactId = null;
   els.status.value = "active";
   els.archiveContactBtn.classList.add("hidden");
+  els.drawerEyebrow.textContent = "New Contact";
+  els.drawerTitle.textContent = "Add Contact";
 }
 
 function fillForm(contact) {
+  state.editingContactId = contact.id;
   els.contactId.value = contact.id || "";
   els.fullName.value = contact.fullName || "";
   els.relationship.value = contact.relationship || "";
@@ -399,144 +185,320 @@ function fillForm(contact) {
   els.notes.value = contact.notes || "";
 }
 
-function openDrawer(contact = null) {
-  resetForm();
+function renderStats() {
+  const total = state.contacts.length;
 
-  if (contact) {
-    state.editingContactId = contact.id;
-    fillForm(contact);
-    els.drawerEyebrow.textContent = "Edit Contact";
-    els.drawerTitle.textContent = contact.fullName || "Edit Contact";
-    els.archiveContactBtn.classList.remove("hidden");
-  } else {
-    els.drawerEyebrow.textContent = "New Contact";
-    els.drawerTitle.textContent = "Add Contact";
+  const activeThisMonth = state.contacts.filter((contact) => {
+    if (!contact.lastContactedAt) return false;
+    const date = contact.lastContactedAt?.toDate
+      ? contact.lastContactedAt.toDate()
+      : new Date(contact.lastContactedAt);
+
+    if (Number.isNaN(date.getTime())) return false;
+
+    const now = new Date();
+    return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+  }).length;
+
+  const needFollowUp = state.contacts.filter((contact) =>
+    isFollowUpNeeded(toDateInputValue(contact.nextFollowUpAt))
+  ).length;
+
+  const companiesRepresented = new Set(
+    state.contacts
+      .map((contact) => (contact.company || "").trim())
+      .filter(Boolean)
+      .map((company) => company.toLowerCase())
+  ).size;
+
+  els.totalContactsStat.textContent = total;
+  els.activeThisMonthStat.textContent = activeThisMonth;
+  els.needFollowUpStat.textContent = needFollowUp;
+  els.companiesRepresentedStat.textContent = companiesRepresented;
+}
+
+function renderRelationshipOptions() {
+  const currentValue = els.relationshipFilter.value || "all";
+
+  const relationships = Array.from(
+    new Set(
+      state.contacts
+        .map((contact) => (contact.relationship || "").trim())
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b));
+
+  els.relationshipFilter.innerHTML = `<option value="all">All relationships</option>`;
+
+  relationships.forEach((relationship) => {
+    const option = document.createElement("option");
+    option.value = relationship;
+    option.textContent = relationship;
+    els.relationshipFilter.appendChild(option);
+  });
+
+  if ([...els.relationshipFilter.options].some((opt) => opt.value === currentValue)) {
+    els.relationshipFilter.value = currentValue;
+  }
+}
+
+function sortContacts(contacts) {
+  const sortValue = els.sortSelect.value;
+
+  const sorted = [...contacts];
+
+  if (sortValue === "nameAZ") {
+    sorted.sort((a, b) => (a.fullName || "").localeCompare(b.fullName || ""));
+    return sorted;
   }
 
-  els.drawerBackdrop.classList.remove("hidden");
-  els.contactDrawer.classList.add("open");
-  els.contactDrawer.setAttribute("aria-hidden", "false");
-  document.body.classList.add("drawer-open");
+  if (sortValue === "lastContacted") {
+    sorted.sort((a, b) => {
+      const aTime = new Date(toDateInputValue(a.lastContactedAt) || "1900-01-01").getTime();
+      const bTime = new Date(toDateInputValue(b.lastContactedAt) || "1900-01-01").getTime();
+      return bTime - aTime;
+    });
+    return sorted;
+  }
+
+  if (sortValue === "followUpSoon") {
+    sorted.sort((a, b) => {
+      const aTime = new Date(toDateInputValue(a.nextFollowUpAt) || "9999-12-31").getTime();
+      const bTime = new Date(toDateInputValue(b.nextFollowUpAt) || "9999-12-31").getTime();
+      return aTime - bTime;
+    });
+    return sorted;
+  }
+
+  sorted.sort((a, b) => {
+    const aCreated = a.createdAt?.seconds || 0;
+    const bCreated = b.createdAt?.seconds || 0;
+    return bCreated - aCreated;
+  });
+
+  return sorted;
 }
 
-function closeDrawer() {
-  els.contactDrawer.classList.remove("open");
-  els.contactDrawer.setAttribute("aria-hidden", "true");
-  els.drawerBackdrop.classList.add("hidden");
-  document.body.classList.remove("drawer-open");
+function applyFilters() {
+  const searchTerm = els.searchInput.value.trim().toLowerCase();
+  const relationshipFilter = els.relationshipFilter.value;
+  const statusFilter = els.statusFilter.value;
+
+  let result = [...state.contacts];
+
+  if (searchTerm) {
+    result = result.filter((contact) => {
+      const haystack = [
+        contact.fullName,
+        contact.company,
+        contact.role,
+        contact.email,
+        contact.relationship,
+        contact.notes
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(searchTerm);
+    });
+  }
+
+  if (relationshipFilter !== "all") {
+    result = result.filter((contact) => (contact.relationship || "") === relationshipFilter);
+  }
+
+  if (statusFilter !== "all") {
+    result = result.filter((contact) => (contact.status || "cold") === statusFilter);
+  }
+
+  state.filteredContacts = sortContacts(result);
+  renderContactsGrid();
 }
 
-function buildContactPayload() {
-  const fullName = els.fullName.value.trim();
+function renderContactsGrid() {
+  const contacts = state.filteredContacts;
+  els.contactsGrid.innerHTML = "";
 
-  return {
-    fullName,
-    company: els.company.value.trim(),
-    role: els.role.value.trim(),
-    email: els.email.value.trim(),
-    phone: els.phone.value.trim(),
-    linkedinUrl: els.linkedinUrl.value.trim(),
-    relationship: els.relationship.value.trim(),
-    status: els.status.value,
-    source: els.source.value.trim(),
-    notes: els.notes.value.trim(),
-    lastContactedAt: toDateStringOrNull(els.lastContactedAt.value),
-    nextFollowUpAt: toDateStringOrNull(els.nextFollowUpAt.value),
-    archived: false,
-    updatedAt: serverTimestamp()
-  };
+  els.emptyState.classList.toggle("hidden", contacts.length > 0);
+
+  contacts.forEach((contact) => {
+    const card = document.createElement("article");
+    card.className = "contact-card";
+
+    const companyText = contact.company
+      ? `<span class="contact-company">${escapeHtml(contact.company)}</span>`
+      : "No company";
+
+    const roleText = contact.role ? ` · ${escapeHtml(contact.role)}` : "";
+
+    const detailItems = [
+      contact.email
+        ? `<div class="contact-detail"><span class="contact-detail-label">Email:</span><a class="contact-link" href="mailto:${escapeHtml(contact.email)}">${escapeHtml(contact.email)}</a></div>`
+        : "",
+      contact.phone
+        ? `<div class="contact-detail"><span class="contact-detail-label">Phone:</span><span>${escapeHtml(contact.phone)}</span></div>`
+        : "",
+      contact.linkedinUrl
+        ? `<div class="contact-detail"><span class="contact-detail-label">LinkedIn:</span><a class="contact-link" href="${escapeHtml(contact.linkedinUrl)}" target="_blank" rel="noopener noreferrer">Profile</a></div>`
+        : "",
+      contact.lastContactedAt
+        ? `<div class="contact-detail"><span class="contact-detail-label">Last contacted:</span><span>${formatDate(contact.lastContactedAt)}</span></div>`
+        : "",
+      contact.nextFollowUpAt
+        ? `<div class="contact-detail"><span class="contact-detail-label">Next follow-up:</span><span>${formatDate(contact.nextFollowUpAt)}</span></div>`
+        : ""
+    ].filter(Boolean);
+
+    card.innerHTML = `
+      <div class="contact-top">
+        <div class="contact-main">
+          <div class="avatar">${escapeHtml(getInitials(contact.fullName))}</div>
+          <div class="contact-name-block">
+            <h3 class="contact-name">${escapeHtml(contact.fullName || "Unnamed Contact")}</h3>
+            <p class="contact-role">${companyText}${roleText}</p>
+          </div>
+        </div>
+
+        <div class="contact-actions">
+          <button class="icon-btn edit-contact-btn" type="button" aria-label="Edit contact">✎</button>
+        </div>
+      </div>
+
+      <div class="contact-badges">
+        <span class="badge ${getStatusBadgeClass(contact.status)}">${getStatusLabel(contact.status)}</span>
+        ${contact.relationship ? `<span class="badge">${escapeHtml(contact.relationship)}</span>` : ""}
+        ${isFollowUpNeeded(toDateInputValue(contact.nextFollowUpAt)) ? `<span class="badge badge-status-warm">Follow-up due</span>` : ""}
+      </div>
+
+      <div class="contact-details">
+        ${detailItems.join("")}
+      </div>
+
+      <div class="contact-details">
+        <div class="contact-detail">
+          <span>${escapeHtml(truncateText(contact.notes))}</span>
+        </div>
+      </div>
+    `;
+
+    card.querySelector(".edit-contact-btn")?.addEventListener("click", () => {
+      fillForm(contact);
+      openDrawer(true);
+    });
+
+    els.contactsGrid.appendChild(card);
+  });
 }
 
-async function loadContacts(uid) {
-  const contactsRef = getContactsCollectionRef(uid);
-  const q = query(contactsRef, orderBy("createdAt", "desc"));
+async function loadContacts() {
+  const contactsQuery = query(getContactsRef(), orderBy("createdAt", "desc"));
+  const snapshot = await getDocs(contactsQuery);
 
-  const snap = await getDocs(q);
-  state.contacts = snap.docs.map((docSnap) => ({
+  state.contacts = snapshot.docs.map((docSnap) => ({
     id: docSnap.id,
     ...docSnap.data()
   }));
 
   renderStats();
-  renderRelationshipFilterOptions();
+  renderRelationshipOptions();
   applyFilters();
 }
 
-async function saveContact(event) {
-  event.preventDefault();
+async function saveContact() {
+  const payload = {
+    fullName: els.fullName.value.trim(),
+    relationship: els.relationship.value.trim(),
+    company: els.company.value.trim(),
+    role: els.role.value.trim(),
+    email: els.email.value.trim(),
+    phone: els.phone.value.trim(),
+    linkedinUrl: els.linkedinUrl.value.trim(),
+    source: els.source.value.trim(),
+    status: els.status.value || "active",
+    relatedOpportunityIds: getNormalizedRelatedIds(els.relatedOpportunityIds.value),
+    lastContactedAt: els.lastContactedAt.value || "",
+    nextFollowUpAt: els.nextFollowUpAt.value || "",
+    notes: els.notes.value.trim(),
+    updatedAt: serverTimestamp()
+  };
 
-  if (!state.currentUser) return;
-
-  const fullName = els.fullName.value.trim();
-  if (!fullName) {
-    alert("Full name is required.");
+  if (!payload.fullName) {
+    alert("Please enter a full name.");
     return;
   }
 
-  const payload = buildContactPayload();
-  const contactsRef = getContactsCollectionRef(state.currentUser.uid);
-
   try {
     if (state.editingContactId) {
-      const contactRef = doc(db, "users", state.currentUser.uid, "contacts", state.editingContactId);
-      await updateDoc(contactRef, payload);
+      await updateDoc(getContactDocRef(state.editingContactId), payload);
     } else {
-      await addDoc(contactsRef, {
+      await addDoc(getContactsRef(), {
         ...payload,
+        archived: false,
         createdAt: serverTimestamp()
-    });
+      });
     }
 
+    await loadContacts();
     closeDrawer();
-    resetForm();
-    await loadContacts(state.currentUser.uid);
   } catch (error) {
     console.error("Error saving contact:", error);
-    alert("There was a problem saving this contact.");
+    alert("Could not save contact. Please try again.");
   }
 }
 
 async function archiveCurrentContact() {
-  if (!state.currentUser || !state.editingContactId) return;
-
-  const confirmed = window.confirm("Archive this contact?");
-  if (!confirmed) return;
+  if (!state.editingContactId) return;
 
   try {
-    const contactRef = doc(db, "users", state.currentUser.uid, "contacts", state.editingContactId);
-    await updateDoc(contactRef, {
+    await updateDoc(getContactDocRef(state.editingContactId), {
       archived: true,
-      updatedAt: Timestamp.now()
+      updatedAt: serverTimestamp()
     });
 
+    await loadContacts();
     closeDrawer();
-    resetForm();
-    await loadContacts(state.currentUser.uid);
   } catch (error) {
     console.error("Error archiving contact:", error);
-    alert("There was a problem archiving this contact.");
+    alert("Could not archive contact.");
   }
 }
 
 function bindEvents() {
-  els.addContactBtn.addEventListener("click", () => openDrawer());
-  els.emptyAddContactBtn.addEventListener("click", () => openDrawer());
-
-  els.closeDrawerBtn.addEventListener("click", closeDrawer);
-  els.cancelDrawerBtn.addEventListener("click", closeDrawer);
-  els.drawerBackdrop.addEventListener("click", closeDrawer);
-  els.archiveContactBtn.addEventListener("click", archiveCurrentContact);
-
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") closeDrawer();
+  els.addContactBtn?.addEventListener("click", () => {
+    resetForm();
+    openDrawer(false);
   });
 
-  els.contactForm.addEventListener("submit", saveContact);
+  els.emptyAddContactBtn?.addEventListener("click", () => {
+    resetForm();
+    openDrawer(false);
+  });
 
-  els.searchInput.addEventListener("input", applyFilters);
-  els.relationshipFilter.addEventListener("change", applyFilters);
-  els.statusFilter.addEventListener("change", applyFilters);
-  els.sortSelect.addEventListener("change", applyFilters);
+  els.closeDrawerBtn?.addEventListener("click", closeDrawer);
+  els.cancelDrawerBtn?.addEventListener("click", closeDrawer);
+
+  els.drawerBackdrop?.addEventListener("click", closeDrawer);
+
+  els.contactForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await saveContact();
+  });
+
+  els.archiveContactBtn?.addEventListener("click", archiveCurrentContact);
+
+  els.searchInput?.addEventListener("input", applyFilters);
+  els.relationshipFilter?.addEventListener("change", applyFilters);
+  els.statusFilter?.addEventListener("change", applyFilters);
+  els.sortSelect?.addEventListener("change", applyFilters);
 }
 
-bindEvents();
+async function init() {
+  bindEvents();
+  state.user = await waitForUser();
+  await loadContacts();
+}
+
+init().catch((error) => {
+  console.error("Contacts init failed:", error);
+  alert("Could not load contacts.");
+});

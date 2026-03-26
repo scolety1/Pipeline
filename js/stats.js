@@ -1,44 +1,11 @@
-import { auth, db } from "./firebase-config.js";
+import { db } from "./firebase-config.js";
+import { waitForUser } from "./protected-page.js";
 import {
-  onAuthStateChanged,
-  signOut
-} from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
-
-import {
-  doc,
-  getDoc,
   collection,
   getDocs,
   query,
   orderBy
 } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
-
-onAuthStateChanged(auth, async (user) => {
-  if (!user) {
-    console.log("No user signed in");
-    window.location.replace("login.html");
-    return;
-  }
-
-  currentUser = user;
-
-  if (userNameEl) {
-    userNameEl.textContent =
-      user.displayName?.trim() || user.email?.split("@")[0] || "User";
-  }
-
-  if (userEmailEl) {
-    userEmailEl.textContent = user.email || "";
-  }
-
-  await loadApplications();
-  await loadSavedDrafts();
-});
-
-
-const userNameEl = document.getElementById("userName");
-const userEmailEl = document.getElementById("userEmail");
-const logoutBtn = document.getElementById("logoutBtn");
 
 const statTotalEl = document.getElementById("statTotal");
 const statActiveEl = document.getElementById("statActive");
@@ -61,8 +28,14 @@ const bestNextMoveEl = document.getElementById("bestNextMove");
 const topCompaniesListEl = document.getElementById("topCompaniesList");
 const recentApplicationsListEl = document.getElementById("recentApplicationsList");
 
-let currentUser = null;
-let applications = [];
+const state = {
+  user: null,
+  applications: []
+};
+
+function getApplicationsRef() {
+  return collection(db, "users", state.user.uid, "applications");
+}
 
 function normalizeStatus(status) {
   if (status === "heard_back") return "follow_up";
@@ -84,9 +57,9 @@ function normalizeOfferResponse(value) {
   return validResponses.includes(value) ? value : "maybe";
 }
 
-function escapeHtml(value) {
+function escapeHtml(value = "") {
   const div = document.createElement("div");
-  div.textContent = value ?? "";
+  div.textContent = value;
   return div.innerHTML;
 }
 
@@ -109,10 +82,10 @@ function getFollowUpState(nextFollowUp) {
 }
 
 function getFollowUpsDueCount() {
-  return applications.filter((app) => {
+  return state.applications.filter((app) => {
     if (app.status === "archived") return false;
-    const state = getFollowUpState(app.nextFollowUp);
-    return state === "overdue" || state === "due";
+    const followUpState = getFollowUpState(app.nextFollowUp);
+    return followUpState === "overdue" || followUpState === "due";
   }).length;
 }
 
@@ -152,7 +125,7 @@ function renderTopCompanies(companyMap) {
 }
 
 function renderRecentApplications() {
-  const recent = [...applications].slice(0, 5);
+  const recent = [...state.applications].slice(0, 5);
 
   if (!recent.length) {
     recentApplicationsListEl.innerHTML = `
@@ -233,25 +206,6 @@ function determineBestNextMove({
   return "Keep adding opportunities and pushing applications forward.";
 }
 
-async function loadUserProfile(user) {
-  userEmailEl.textContent = user.email || "";
-
-  try {
-    const userRef = doc(db, "users", user.uid);
-    const userSnap = await getDoc(userRef);
-
-    if (userSnap.exists()) {
-      const userData = userSnap.data();
-      userNameEl.textContent = userData.name || "User";
-    } else {
-      userNameEl.textContent = "User";
-    }
-  } catch (error) {
-    console.error("Error loading user:", error);
-    userNameEl.textContent = "User";
-  }
-}
-
 function renderStats() {
   const counts = {
     need_to_apply: 0,
@@ -268,7 +222,7 @@ function renderStats() {
   let highPriorityCount = 0;
   const companyMap = {};
 
-  applications.forEach((app) => {
+  state.applications.forEach((app) => {
     const status = normalizeStatus(app.status);
     counts[status] += 1;
 
@@ -282,7 +236,6 @@ function renderStats() {
 
     if (status === "offer") {
       offerCount += 1;
-      app.offerResponse = normalizeOfferResponse(app.offerResponse);
     }
 
     if (app.priority === "high") {
@@ -295,7 +248,7 @@ function renderStats() {
     }
   });
 
-  const total = applications.length;
+  const total = state.applications.length;
   const followUpsDue = getFollowUpsDueCount();
   const responseRate = formatPercent(responseCount, total);
   const offerRate = formatPercent(offerCount, total);
@@ -333,73 +286,80 @@ function renderStats() {
   renderRecentApplications();
 }
 
-async function loadApplications(user) {
+function renderLoadError() {
+  topCompaniesListEl.innerHTML = `
+    <div class="empty-state">
+      <p>Could not load stats right now.</p>
+    </div>
+  `;
+
+  recentApplicationsListEl.innerHTML = `
+    <div class="empty-state">
+      <p>Could not load recent applications right now.</p>
+    </div>
+  `;
+}
+
+async function loadApplications() {
   try {
-    const appsRef = collection(db, "users", user.uid, "applications");
-    const appsQuery = query(appsRef, orderBy("createdAt", "desc"));
+    const appsQuery = query(getApplicationsRef(), orderBy("createdAt", "desc"));
     const snapshot = await getDocs(appsQuery);
 
-    applications = snapshot.docs.map((docSnap) => {
+    state.applications = snapshot.docs.map((docSnap) => {
       const data = docSnap.data();
+      const status = normalizeStatus(data.status);
 
       return {
         id: docSnap.id,
         ...data,
-        status: normalizeStatus(data.status),
-        offerResponse:
-          normalizeStatus(data.status) === "offer"
-            ? normalizeOfferResponse(data.offerResponse)
-            : ""
+        status,
+        offerResponse: status === "offer"
+          ? normalizeOfferResponse(data.offerResponse)
+          : ""
       };
     });
 
     renderStats();
   } catch (error) {
-    console.error("Error loading applications:", error);
+    console.error("Ordered stats load failed, trying fallback:", error);
 
     try {
-      const appsRef = collection(db, "users", user.uid, "applications");
-      const snapshot = await getDocs(appsRef);
+      const snapshot = await getDocs(getApplicationsRef());
 
-      applications = snapshot.docs.map((docSnap) => {
+      state.applications = snapshot.docs.map((docSnap) => {
         const data = docSnap.data();
+        const status = normalizeStatus(data.status);
 
         return {
           id: docSnap.id,
           ...data,
-          status: normalizeStatus(data.status),
-          offerResponse:
-            normalizeStatus(data.status) === "offer"
-              ? normalizeOfferResponse(data.offerResponse)
-              : ""
+          status,
+          offerResponse: status === "offer"
+            ? normalizeOfferResponse(data.offerResponse)
+            : ""
         };
+      });
+
+      state.applications.sort((a, b) => {
+        const aSeconds = a.createdAt?.seconds || 0;
+        const bSeconds = b.createdAt?.seconds || 0;
+        return bSeconds - aSeconds;
       });
 
       renderStats();
     } catch (fallbackError) {
-      console.error("Fallback load failed:", fallbackError);
-
-      topCompaniesListEl.innerHTML = `
-        <div class="empty-state">
-          <p>Could not load stats right now.</p>
-        </div>
-      `;
-
-      recentApplicationsListEl.innerHTML = `
-        <div class="empty-state">
-          <p>Could not load recent applications right now.</p>
-        </div>
-      `;
+      console.error("Fallback stats load failed:", fallbackError);
+      renderLoadError();
     }
   }
 }
 
-logoutBtn.addEventListener("click", async () => {
-  try {
-    await signOut(auth);
-    window.location.href = "login.html";
-  } catch (error) {
-    console.error("Logout failed:", error);
-    alert("Could not log out. Please try again.");
-  }
+async function init() {
+  state.user = await waitForUser();
+  await loadApplications();
+}
+
+init().catch((error) => {
+  console.error("Stats init failed:", error);
+  renderLoadError();
 });
