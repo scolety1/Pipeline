@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pipeline | Dashboard</title>
+  <link rel="stylesheet" href="css/protected.css" />
+  <link rel="stylesheet" href="css/dashboard.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="app-header-left">
+      <a href="dashboard.html" class="app-brand">Pipeline</a>
+
+      <nav class="app-nav">
+        <a href="dashboard.html" class="app-nav-link active">Dashboard</a>
+        <a href="contacts.html" class="app-nav-link">Contacts</a>
+        <a href="email-generator.html" class="app-nav-link">AI Email</a>
+        <a href="stats.html" class="app-nav-link">Stats</a>
+      </nav>
+    </div>
+
+    <div class="app-header-right">
+      <div class="user-meta">
+        <span class="user-name" id="userName">Loading...</span>
+        <span class="user-email" id="userEmail"></span>
+      </div>
+      <button id="logoutBtn" class="logout-btn" type="button">Log Out</button>
+    </div>
+  </header>
+
+  <main class="dashboard-page">
+    <section class="hero">
+      <div>
+        <p class="eyebrow">Overview</p>
+        <h1>Your application pipeline</h1>
+        <p class="hero-subtext">
+          Track where every application stands and keep momentum moving.
+        </p>
+      </div>
+      <button class="primary-btn" id="openModalBtn" type="button">+ Add Application</button>
+    </section>
+
+    <section class="stats-grid">
+      <article class="stat-card">
+        <p class="stat-label">Total Applications</p>
+        <h2 id="statTotal">0</h2>
+      </article>
+
+      <article class="stat-card">
+        <p class="stat-label">Follow Ups Due</p>
+        <h2 id="statFollowUpsDue">0</h2>
+      </article>
+
+      <article class="stat-card">
+        <p class="stat-label">Interviewing</p>
+        <h2 id="statInterviewing">0</h2>
+      </article>
+
+      <article class="stat-card">
+        <p class="stat-label">Offers</p>
+        <h2 id="statOffers">0</h2>
+      </article>
+    </section>
+
+    <section class="board-wrapper">
+      <section class="board">
+        <article class="column">
+          <div class="column-header">
+            <h3>Need to Apply</h3>
+            <span id="countNeedToApply">0</span>
+          </div>
+          <div class="column-body" id="need_to_applyColumn"></div>
+        </article>
+
+        <article class="column">
+          <div class="column-header">
+            <h3>Applied</h3>
+            <span id="countApplied">0</span>
+          </div>
+          <div class="column-body" id="appliedColumn"></div>
+        </article>
+
+        <article class="column">
+          <div class="column-header">
+            <h3>Follow Up</h3>
+            <span id="countFollowUp">0</span>
+          </div>
+          <div class="column-body" id="follow_upColumn"></div>
+        </article>
+
+        <article class="column">
+          <div class="column-header">
+            <h3>Interviewing</h3>
+            <span id="countInterviewing">0</span>
+          </div>
+          <div class="column-body" id="interviewingColumn"></div>
+        </article>
+
+        <article class="column">
+          <div class="column-header">
+            <h3>Offer</h3>
+            <span id="countOffer">0</span>
+          </div>
+          <div class="column-body" id="offerColumn"></div>
+        </article>
+      </section>
+    </section>
+
+    <section class="archived-section">
+      <button class="archived-header" id="archivedToggle" type="button">
+        <div class="archived-header-left">
+          <h3>Archived</h3>
+          <p>Click to expand or collapse your archived applications</p>
+        </div>
+        <span id="archivedCount">0</span>
+      </button>
+
+      <div class="archived-body collapsed" id="archivedColumn"></div>
+    </section>
+  </main>
+
+  <div class="modal-backdrop hidden" id="modalBackdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Add Application</h2>
+        <button class="icon-btn" id="closeModalBtn" type="button">&times;</button>
+      </div>
+
+      <p id="formMessage" class="form-message"></p>
+
+      <form id="applicationForm" class="application-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="company">Company</label>
+            <input type="text" id="company" required />
+          </div>
+
+          <div class="form-group">
+            <label for="title">Role Title</label>
+            <input type="text" id="title" required />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="status">Status</label>
+            <select id="status" required>
+              <option value="need_to_apply">Need to Apply</option>
+              <option value="applied">Applied</option>
+              <option value="follow_up">Follow Up</option>
+              <option value="interviewing">Interviewing</option>
+              <option value="offer">Offer</option>
+              <option value="archived">Archived</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="priority">Priority</label>
+            <select id="priority">
+              <option value="low">Low</option>
+              <option value="medium" selected>Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row hidden" id="offerResponseRow">
+          <div class="form-group">
+            <label for="offerResponse">Offer Decision</label>
+            <select id="offerResponse">
+              <option value="yes">Yes</option>
+              <option value="maybe" selected>Maybe</option>
+              <option value="no">No</option>
+            </select>
+          </div>
+          <div class="form-group"></div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="dateApplied">Date Applied</label>
+            <input type="date" id="dateApplied" />
+          </div>
+
+          <div class="form-group">
+            <label for="nextFollowUp">Next Follow Up</label>
+            <input type="date" id="nextFollowUp" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="location">Location</label>
+            <input type="text" id="location" placeholder="Remote, Bozeman, New York..." />
+          </div>
+
+          <div class="form-group">
+            <label for="link">Application Link</label>
+            <input type="url" id="link" placeholder="https://..." />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="notes">Notes</label>
+          <textarea id="notes" rows="4" placeholder="Any notes, contacts, deadlines, or reminders..."></textarea>
+        </div>
+
+        <div class="modal-actions">
+          <button class="secondary-btn" id="cancelModalBtn" type="button">Cancel</button>
+          <button class="primary-btn" id="saveApplicationBtn" type="submit">Save Application</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="drawer-backdrop hidden" id="drawerBackdrop">
+    <aside class="drawer" id="applicationDrawer">
+      <div class="drawer-header">
+        <div>
+          <p class="drawer-eyebrow">Application Details</p>
+          <h2 id="drawerTitleHeading">Edit Application</h2>
+        </div>
+        <button class="icon-btn" id="closeDrawerBtn" type="button">&times;</button>
+      </div>
+
+      <p id="drawerMessage" class="form-message"></p>
+
+      <form id="drawerForm" class="application-form">
+        <div class="form-group">
+          <label for="drawerCompany">Company</label>
+          <input type="text" id="drawerCompany" required />
+        </div>
+
+        <div class="form-group">
+          <label for="drawerTitle">Role Title</label>
+          <input type="text" id="drawerTitle" required />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="drawerStatus">Status</label>
+            <select id="drawerStatus" required>
+              <option value="need_to_apply">Need to Apply</option>
+              <option value="applied">Applied</option>
+              <option value="follow_up">Follow Up</option>
+              <option value="interviewing">Interviewing</option>
+              <option value="offer">Offer</option>
+              <option value="archived">Archived</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="drawerPriority">Priority</label>
+            <select id="drawerPriority">
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row hidden" id="drawerOfferResponseRow">
+          <div class="form-group">
+            <label for="drawerOfferResponse">Offer Decision</label>
+            <select id="drawerOfferResponse">
+              <option value="yes">Yes</option>
+              <option value="maybe">Maybe</option>
+              <option value="no">No</option>
+            </select>
+          </div>
+          <div class="form-group"></div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="drawerDateApplied">Date Applied</label>
+            <input type="date" id="drawerDateApplied" />
+          </div>
+
+          <div class="form-group">
+            <label for="drawerNextFollowUp">Next Follow Up</label>
+            <input type="date" id="drawerNextFollowUp" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="drawerLocation">Location</label>
+            <input type="text" id="drawerLocation" />
+          </div>
+
+          <div class="form-group">
+            <label for="drawerLink">Application Link</label>
+            <input type="url" id="drawerLink" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="drawerNotes">Notes</label>
+          <textarea id="drawerNotes" rows="6"></textarea>
+        </div>
+
+        <div class="drawer-actions">
+          <button class="danger-btn" id="deleteApplicationBtn" type="button">Delete</button>
+          <div class="drawer-actions-right">
+            <button class="secondary-btn" id="cancelDrawerBtn" type="button">Close</button>
+            <button class="primary-btn" id="saveDrawerBtn" type="submit">Save Changes</button>
+          </div>
+        </div>
+      </form>
+    </aside>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+  <script type="module" src="js/guard.js"></script>
+  <script type="module" src="js/dashboard.js"></script>
+</body>
+</html>

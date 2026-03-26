@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pipeline • AI Email Generator</title>
+  <link rel="stylesheet" href="css/protected.css" />
+  <link rel="stylesheet" href="css/email-generator.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="app-header-left">
+      <a href="dashboard.html" class="app-brand">Pipeline</a>
+
+      <nav class="app-nav">
+        <a href="dashboard.html" class="app-nav-link">Dashboard</a>
+        <a href="contacts.html" class="app-nav-link">Contacts</a>
+        <a href="email-generator.html" class="app-nav-link active">AI Email</a>
+        <a href="stats.html" class="app-nav-link">Stats</a>
+      </nav>
+    </div>
+
+    <div class="app-header-right">
+      <div class="user-meta">
+        <span class="user-name" id="userName">Loading...</span>
+        <span class="user-email" id="userEmail"></span>
+      </div>
+      <button id="logoutBtn" class="logout-btn" type="button">Log Out</button>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <header class="page-header">
+      <div>
+        <p class="eyebrow">Pipeline</p>
+        <h1>AI Email Generator</h1>
+        <p class="page-subtitle">
+          Generate polished outreach drafts from your saved applications.
+        </p>
+      </div>
+
+      <div class="header-actions">
+        <button id="refreshApplicationsBtn" class="secondary-btn" type="button">
+          Refresh Applications
+        </button>
+      </div>
+    </header>
+
+    <section class="summary-row">
+      <article class="summary-card">
+        <span class="summary-label">Draft Type</span>
+        <strong id="selectedDraftTypePreview">—</strong>
+      </article>
+
+      <article class="summary-card">
+        <span class="summary-label">Tone</span>
+        <strong id="selectedTonePreview">—</strong>
+      </article>
+
+      <article class="summary-card">
+        <span class="summary-label">Selected Company</span>
+        <strong id="selectedCompanyPreview">—</strong>
+      </article>
+    </section>
+
+    <section class="generator-layout">
+      <div class="panel form-panel">
+        <div class="panel-header">
+          <h2>Email Setup</h2>
+          <p>Choose the application and how you want the draft to sound.</p>
+        </div>
+
+        <form id="emailGeneratorForm" class="generator-form">
+          <div class="form-group">
+            <label for="applicationSelect">Application</label>
+            <select id="applicationSelect" name="applicationSelect" required>
+              <option value="">Select an application</option>
+            </select>
+          </div>
+
+          <div class="application-preview-card" id="applicationPreviewCard">
+            <div class="preview-row">
+              <span class="preview-label">Company</span>
+              <span id="previewCompany">—</span>
+            </div>
+            <div class="preview-row">
+              <span class="preview-label">Role</span>
+              <span id="previewRole">—</span>
+            </div>
+            <div class="preview-row">
+              <span class="preview-label">Contact</span>
+              <span id="previewContact">—</span>
+            </div>
+            <div class="preview-row">
+              <span class="preview-label">Status</span>
+              <span id="previewStatus">—</span>
+            </div>
+            <div class="preview-row">
+              <span class="preview-label">Notes</span>
+              <span id="previewNotes">No notes yet.</span>
+            </div>
+          </div>
+
+          <div class="form-row two-col">
+            <div class="form-group">
+              <label for="emailType">Email Type</label>
+              <select id="emailType" name="emailType" required>
+                <option value="">Choose type</option>
+                <option value="follow-up">Follow-up After Applying</option>
+                <option value="thank-you">Thank You After Interview</option>
+                <option value="networking">Networking Outreach</option>
+                <option value="cold-outreach">Cold Outreach</option>
+                <option value="check-in">Checking In</option>
+                <option value="referral-request">Referral Request</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="toneSelect">Tone</label>
+              <select id="toneSelect" name="toneSelect" required>
+                <option value="">Choose tone</option>
+                <option value="professional">Professional</option>
+                <option value="warm">Warm</option>
+                <option value="concise">Concise</option>
+                <option value="confident">Confident</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="extraContext">
+              Extra Context
+              <span class="optional-text">(optional)</span>
+            </label>
+            <textarea
+              id="extraContext"
+              name="extraContext"
+              rows="6"
+              placeholder="Example: Mention that I met them at the career fair, or that I’m especially interested in the company because of the blend of software and finance."
+            ></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="customGoal">
+              Specific Goal
+              <span class="optional-text">(optional)</span>
+            </label>
+            <input
+              type="text"
+              id="customGoal"
+              name="customGoal"
+              placeholder="Example: Ask if there are any updates on the position"
+            />
+          </div>
+
+          <div class="form-actions">
+            <button id="generateDraftBtn" class="primary-btn" type="submit">
+              Generate Draft
+            </button>
+            <button id="clearFormBtn" class="ghost-btn" type="button">
+              Clear
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div class="panel output-panel">
+        <div class="panel-header">
+          <h2>Generated Draft</h2>
+          <p>Edit, copy, or save the result back to Pipeline.</p>
+        </div>
+
+        <div id="loadingState" class="loading-state hidden">
+          <div class="loading-spinner"></div>
+          <p>Generating your draft...</p>
+        </div>
+
+        <div id="emptyState" class="empty-state">
+          <div class="empty-icon">✉️</div>
+          <h3>No draft yet</h3>
+          <p>Select an application and generate an email to see the result here.</p>
+        </div>
+
+        <div id="draftOutput" class="draft-output hidden">
+          <div class="output-group">
+            <label for="generatedSubject">Subject</label>
+            <input
+              type="text"
+              id="generatedSubject"
+              name="generatedSubject"
+              placeholder="Generated subject will appear here"
+            />
+          </div>
+
+          <div class="output-group">
+            <label for="generatedBody">Email Body</label>
+            <textarea
+              id="generatedBody"
+              name="generatedBody"
+              rows="16"
+              placeholder="Generated email body will appear here"
+            ></textarea>
+          </div>
+
+          <div class="output-actions">
+            <button id="copySubjectBtn" class="secondary-btn" type="button">
+              Copy Subject
+            </button>
+            <button id="copyBodyBtn" class="secondary-btn" type="button">
+              Copy Email
+            </button>
+            <button id="saveDraftBtn" class="primary-btn" type="button">
+              Save Draft
+            </button>
+          </div>
+
+          <div class="quick-edit-row">
+            <button id="shorterBtn" class="ghost-btn" type="button">
+              Make Shorter
+            </button>
+            <button id="warmerBtn" class="ghost-btn" type="button">
+              Make Warmer
+            </button>
+            <button id="strongerBtn" class="ghost-btn" type="button">
+              Make More Confident
+            </button>
+            <button id="regenerateBtn" class="ghost-btn" type="button">
+              Regenerate
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="saved-drafts-section">
+      <div class="section-header">
+        <h2>Recent Saved Drafts</h2>
+        <p>Your latest generated emails for quick reference.</p>
+      </div>
+
+      <div id="savedDraftsList" class="saved-drafts-list">
+        <div class="saved-draft-empty">
+          No saved drafts yet.
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="js/email-generator.js"></script>
+</body>
+</html>

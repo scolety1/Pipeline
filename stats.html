@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pipeline | Stats</title>
+  <link rel="stylesheet" href="css/protected.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="app-header-left">
+      <a href="dashboard.html" class="app-brand">Pipeline</a>
+
+      <nav class="app-nav">
+        <a href="dashboard.html" class="app-nav-link">Dashboard</a>
+        <a href="contacts.html" class="app-nav-link">Contacts</a>
+        <a href="email-generator.html" class="app-nav-link">AI Email</a>
+        <a href="stats.html" class="app-nav-link active">Stats</a>
+      </nav>
+    </div>
+
+    <div class="app-header-right">
+      <div class="user-meta">
+        <span class="user-name" id="userName">Loading...</span>
+        <span class="user-email" id="userEmail"></span>
+      </div>
+      <button id="logoutBtn" class="logout-btn" type="button">Log Out</button>
+    </div>
+  </header>
+
+  <main class="dashboard-page">
+    <section class="hero">
+      <div>
+        <p class="eyebrow">Insights</p>
+        <h1>Your application stats</h1>
+        <p class="hero-subtext">
+          A simple snapshot of your pipeline, response rates, and where to focus next.
+        </p>
+      </div>
+      <a href="dashboard.html" class="secondary-btn" style="text-decoration: none;">Back to Dashboard</a>
+    </section>
+
+    <section class="stats-grid">
+      <article class="stat-card">
+        <p class="stat-label">Total Applications</p>
+        <h2 id="statTotal">0</h2>
+      </article>
+
+      <article class="stat-card">
+        <p class="stat-label">Active Applications</p>
+        <h2 id="statActive">0</h2>
+      </article>
+
+      <article class="stat-card">
+        <p class="stat-label">Response Rate</p>
+        <h2 id="statResponseRate">0%</h2>
+      </article>
+
+      <article class="stat-card">
+        <p class="stat-label">Offer Rate</p>
+        <h2 id="statOfferRate">0%</h2>
+      </article>
+    </section>
+
+    <section class="form-row" style="margin-bottom: 1rem;">
+      <article class="panel" style="padding: 1.25rem;">
+        <div class="section-header">
+          <h2>Pipeline Breakdown</h2>
+          <p>How your applications are currently distributed.</p>
+        </div>
+
+        <div class="application-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="countNeedToApply">Need to Apply</label>
+              <input id="countNeedToApply" type="text" value="0" readonly />
+            </div>
+            <div class="form-group">
+              <label for="countApplied">Applied</label>
+              <input id="countApplied" type="text" value="0" readonly />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="countFollowUp">Follow Up</label>
+              <input id="countFollowUp" type="text" value="0" readonly />
+            </div>
+            <div class="form-group">
+              <label for="countInterviewing">Interviewing</label>
+              <input id="countInterviewing" type="text" value="0" readonly />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="countOffer">Offers</label>
+              <input id="countOffer" type="text" value="0" readonly />
+            </div>
+            <div class="form-group">
+              <label for="countArchived">Archived</label>
+              <input id="countArchived" type="text" value="0" readonly />
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel" style="padding: 1.25rem;">
+        <div class="section-header">
+          <h2>Quick Insights</h2>
+          <p>Simple ratios so you can tell what is actually moving.</p>
+        </div>
+
+        <div class="application-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="insightFollowUpsDue">Follow Ups Due</label>
+              <input id="insightFollowUpsDue" type="text" value="0" readonly />
+            </div>
+            <div class="form-group">
+              <label for="insightInterviewRate">Interview Rate</label>
+              <input id="insightInterviewRate" type="text" value="0%" readonly />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="insightArchivedRate">Archived Rate</label>
+              <input id="insightArchivedRate" type="text" value="0%" readonly />
+            </div>
+            <div class="form-group">
+              <label for="insightHighPriority">High Priority</label>
+              <input id="insightHighPriority" type="text" value="0" readonly />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="bestNextMove">Best Next Move</label>
+            <textarea id="bestNextMove" rows="4" readonly>Start applying to more roles to build momentum.</textarea>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="form-row">
+      <article class="panel" style="padding: 1.25rem;">
+        <div class="section-header">
+          <h2>Top Companies</h2>
+          <p>Where you have been spending the most attention.</p>
+        </div>
+
+        <div id="topCompaniesList" class="application-form">
+          <div class="empty-state">
+            <p>No company data yet.</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel" style="padding: 1.25rem;">
+        <div class="section-header">
+          <h2>Recent Applications</h2>
+          <p>Your latest tracked opportunities.</p>
+        </div>
+
+        <div id="recentApplicationsList" class="application-form">
+          <div class="empty-state">
+            <p>No applications yet.</p>
+          </div>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <script type="module" src="js/guard.js"></script>
+  <script type="module" src="js/stats.js"></script>
+</body>
+</html>

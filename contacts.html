@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pipeline — Contacts</title>
+  <link rel="stylesheet" href="./css/protected.css" />
+  <link rel="stylesheet" href="./css/contacts.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="app-header-left">
+      <a href="dashboard.html" class="app-brand">Pipeline</a>
+
+      <nav class="app-nav">
+        <a href="dashboard.html" class="app-nav-link">Dashboard</a>
+        <a href="contacts.html" class="app-nav-link active">Contacts</a>
+        <a href="email-generator.html" class="app-nav-link">AI Email</a>
+        <a href="stats.html" class="app-nav-link">Stats</a>
+      </nav>
+    </div>
+
+    <div class="app-header-right">
+      <div class="user-meta">
+        <span class="user-name" id="userName">Loading...</span>
+        <span class="user-email" id="userEmail"></span>
+      </div>
+      <button id="logoutBtn" class="logout-btn" type="button">Log Out</button>
+    </div>
+  </header>
+
+  <div class="contacts-page">
+    <header class="page-header">
+      <div>
+        <p class="eyebrow">Pipeline</p>
+        <h1>Contacts</h1>
+        <p class="page-subtitle">
+          People you’ve met, emailed, or want to keep in touch with.
+        </p>
+      </div>
+
+      <div class="header-actions">
+        <button class="btn btn-primary" id="addContactBtn" type="button">+ Add Contact</button>
+      </div>
+    </header>
+
+    <section class="stats-grid" aria-label="Contact stats">
+      <article class="stat-card">
+        <p class="stat-label">Total Contacts</p>
+        <h2 class="stat-value" id="totalContactsStat">0</h2>
+      </article>
+
+      <article class="stat-card">
+        <p class="stat-label">Active This Month</p>
+        <h2 class="stat-value" id="activeThisMonthStat">0</h2>
+      </article>
+
+      <article class="stat-card">
+        <p class="stat-label">Need Follow-Up</p>
+        <h2 class="stat-value" id="needFollowUpStat">0</h2>
+      </article>
+
+      <article class="stat-card">
+        <p class="stat-label">Companies Represented</p>
+        <h2 class="stat-value" id="companiesRepresentedStat">0</h2>
+      </article>
+    </section>
+
+    <section class="toolbar" aria-label="Search and filters">
+      <div class="toolbar-left">
+        <div class="input-group search-group">
+          <label for="searchInput" class="sr-only">Search contacts</label>
+          <input
+            type="text"
+            id="searchInput"
+            placeholder="Search name or company..."
+          />
+        </div>
+
+        <div class="input-group">
+          <label for="relationshipFilter" class="sr-only">Filter by relationship</label>
+          <select id="relationshipFilter">
+            <option value="all">All relationships</option>
+          </select>
+        </div>
+
+        <div class="input-group">
+          <label for="statusFilter" class="sr-only">Filter by status</label>
+          <select id="statusFilter">
+            <option value="all">All statuses</option>
+            <option value="active">🟢 Active</option>
+            <option value="warm">🟡 Warm</option>
+            <option value="cold">⚪ Cold</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="toolbar-right">
+        <div class="input-group">
+          <label for="sortSelect" class="sr-only">Sort contacts</label>
+          <select id="sortSelect">
+            <option value="recent">Recently added</option>
+            <option value="lastContacted">Last contacted</option>
+            <option value="nameAZ">Name A–Z</option>
+            <option value="followUpSoon">Needs follow-up</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <section class="contacts-section">
+      <div id="contactsGrid" class="contacts-grid"></div>
+
+      <div id="emptyState" class="empty-state hidden">
+        <div class="empty-state-card">
+          <h3>No contacts yet</h3>
+          <p>
+            Add recruiters, alumni, referrals, and people you want to keep in touch with.
+          </p>
+          <button class="btn btn-primary" id="emptyAddContactBtn" type="button">Add your first contact</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div id="drawerBackdrop" class="drawer-backdrop hidden"></div>
+
+  <aside id="contactDrawer" class="drawer" aria-hidden="true">
+    <div class="drawer-header">
+      <div>
+        <p class="drawer-eyebrow" id="drawerEyebrow">New Contact</p>
+        <h2 id="drawerTitle">Add Contact</h2>
+      </div>
+      <button class="icon-btn" id="closeDrawerBtn" aria-label="Close drawer" type="button">✕</button>
+    </div>
+
+    <form id="contactForm" class="drawer-body">
+      <input type="hidden" id="contactId" />
+
+      <div class="form-row two-col">
+        <div class="field">
+          <label for="fullName">Full Name</label>
+          <input type="text" id="fullName" required />
+        </div>
+
+        <div class="field">
+          <label for="relationship">Relationship</label>
+          <input type="text" id="relationship" placeholder="Recruiter, alumni, referral..." />
+        </div>
+      </div>
+
+      <div class="form-row two-col">
+        <div class="field">
+          <label for="company">Company</label>
+          <input type="text" id="company" />
+        </div>
+
+        <div class="field">
+          <label for="role">Role / Title</label>
+          <input type="text" id="role" />
+        </div>
+      </div>
+
+      <div class="form-row two-col">
+        <div class="field">
+          <label for="email">Email</label>
+          <input type="email" id="email" />
+        </div>
+
+        <div class="field">
+          <label for="phone">Phone</label>
+          <input type="text" id="phone" />
+        </div>
+      </div>
+
+      <div class="form-row two-col">
+        <div class="field">
+          <label for="linkedinUrl">LinkedIn URL</label>
+          <input type="url" id="linkedinUrl" placeholder="https://..." />
+        </div>
+
+        <div class="field">
+          <label for="source">Source</label>
+          <input type="text" id="source" placeholder="LinkedIn, cold email, event..." />
+        </div>
+      </div>
+
+      <div class="form-row two-col">
+        <div class="field">
+          <label for="status">Status</label>
+          <select id="status">
+            <option value="active">🟢 Active</option>
+            <option value="warm">🟡 Warm</option>
+            <option value="cold">⚪ Cold</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="relatedOpportunityIds">Related Opportunity IDs</label>
+          <input
+            type="text"
+            id="relatedOpportunityIds"
+            placeholder="Comma-separated IDs"
+          />
+        </div>
+      </div>
+
+      <div class="form-row two-col">
+        <div class="field">
+          <label for="lastContactedAt">Last Contacted</label>
+          <input type="date" id="lastContactedAt" />
+        </div>
+
+        <div class="field">
+          <label for="nextFollowUpAt">Next Follow-Up</label>
+          <input type="date" id="nextFollowUpAt" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="field">
+          <label for="notes">Notes</label>
+          <textarea id="notes" rows="6" placeholder="What did you talk about? Anything to remember?"></textarea>
+        </div>
+      </div>
+
+      <div class="drawer-footer">
+        <div class="drawer-footer-left">
+          <button type="button" class="btn btn-danger hidden" id="archiveContactBtn">
+            Archive
+          </button>
+        </div>
+
+        <div class="drawer-footer-right">
+          <button type="button" class="btn btn-secondary" id="cancelDrawerBtn">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="saveContactBtn">Save Contact</button>
+        </div>
+      </div>
+    </form>
+  </aside>
+
+  <script type="module" src="./js/contacts.js"></script>
+</body>
+</html>
