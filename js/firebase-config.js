@@ -3,7 +3,7 @@ import { getAuth } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth
 import { getFirestore } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBnrnzKWWBo8vRPEue1ZuYec5F7rjYMo3k",
+  apiKey: "AIzaSyC1Pewjy3NhWJyx4stlY2JeWFXBS5-UFi0",
   authDomain: "pipeline-2f422.firebaseapp.com",
   projectId: "pipeline-2f422",
   storageBucket: "pipeline-2f422.firebasestorage.app",
