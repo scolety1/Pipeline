@@ -138,6 +138,21 @@ function isFollowUpNeeded(value) {
   return date <= localToday;
 }
 
+function sanitizeHttpUrl(value = "") {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+
+  try {
+    const url = new URL(trimmed);
+    if (url.protocol === "http:" || url.protocol === "https:") {
+      return url.toString();
+    }
+    return "";
+  } catch {
+    return "";
+  }
+}
+
 function openDrawer(isEditing = false) {
   els.contactDrawer.classList.add("open");
   els.contactDrawer.setAttribute("aria-hidden", "false");
@@ -244,7 +259,6 @@ function renderRelationshipOptions() {
 
 function sortContacts(contacts) {
   const sortValue = els.sortSelect.value;
-
   const sorted = [...contacts];
 
   if (sortValue === "nameAZ") {
@@ -331,6 +345,8 @@ function renderContactsGrid() {
 
     const roleText = contact.role ? ` · ${escapeHtml(contact.role)}` : "";
 
+    const safeLinkedInUrl = sanitizeHttpUrl(contact.linkedinUrl);
+
     const detailItems = [
       contact.email
         ? `<div class="contact-detail"><span class="contact-detail-label">Email:</span><a class="contact-link" href="mailto:${escapeHtml(contact.email)}">${escapeHtml(contact.email)}</a></div>`
@@ -338,8 +354,8 @@ function renderContactsGrid() {
       contact.phone
         ? `<div class="contact-detail"><span class="contact-detail-label">Phone:</span><span>${escapeHtml(contact.phone)}</span></div>`
         : "",
-      contact.linkedinUrl
-        ? `<div class="contact-detail"><span class="contact-detail-label">LinkedIn:</span><a class="contact-link" href="${escapeHtml(contact.linkedinUrl)}" target="_blank" rel="noopener noreferrer">Profile</a></div>`
+      safeLinkedInUrl
+        ? `<div class="contact-detail"><span class="contact-detail-label">LinkedIn:</span><a class="contact-link" href="${safeLinkedInUrl}" target="_blank" rel="noopener noreferrer">Profile</a></div>`
         : "",
       contact.lastContactedAt
         ? `<div class="contact-detail"><span class="contact-detail-label">Last contacted:</span><span>${formatDate(contact.lastContactedAt)}</span></div>`
@@ -394,10 +410,12 @@ async function loadContacts() {
   const contactsQuery = query(getContactsRef(), orderBy("createdAt", "desc"));
   const snapshot = await getDocs(contactsQuery);
 
-  state.contacts = snapshot.docs.map((docSnap) => ({
-    id: docSnap.id,
-    ...docSnap.data()
-  }));
+  state.contacts = snapshot.docs
+    .map((docSnap) => ({
+      id: docSnap.id,
+      ...docSnap.data()
+    }))
+    .filter((contact) => !contact.archived);
 
   renderStats();
   renderRelationshipOptions();
@@ -412,7 +430,7 @@ async function saveContact() {
     role: els.role.value.trim(),
     email: els.email.value.trim(),
     phone: els.phone.value.trim(),
-    linkedinUrl: els.linkedinUrl.value.trim(),
+    linkedinUrl: sanitizeHttpUrl(els.linkedinUrl.value),
     source: els.source.value.trim(),
     status: els.status.value || "active",
     relatedOpportunityIds: getNormalizedRelatedIds(els.relatedOpportunityIds.value),

@@ -3,7 +3,8 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
-  onAuthStateChanged
+  onAuthStateChanged,
+  updateProfile
 } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
 
 import {
@@ -12,7 +13,6 @@ import {
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 
-// Elements
 const showLoginBtn = document.getElementById("showLoginBtn");
 const showSignupBtn = document.getElementById("showSignupBtn");
 const submitBtn = document.getElementById("submitBtn");
@@ -26,8 +26,7 @@ const emailInput = document.getElementById("email");
 const passwordInput = document.getElementById("password");
 
 let mode = "login";
-
-// ---------------- UI HELPERS ----------------
+let authBusy = false;
 
 function setMessage(message, isSuccess = false) {
   authMessage.textContent = message;
@@ -48,6 +47,19 @@ function setMode(newMode) {
   setMessage("");
 }
 
+function setBusyState(isBusy) {
+  authBusy = isBusy;
+  submitBtn.disabled = isBusy;
+  forgotPasswordBtn.disabled = isBusy;
+
+  if (isBusy) {
+    submitBtn.textContent = mode === "signup" ? "Creating Account..." : "Logging In...";
+    return;
+  }
+
+  submitBtn.textContent = mode === "signup" ? "Create Account" : "Log In";
+}
+
 function getFormValues() {
   return {
     name: nameInput.value.trim(),
@@ -56,7 +68,49 @@ function getFormValues() {
   };
 }
 
-// ---------------- AUTH STATE ----------------
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function getFriendlyAuthMessage(errorCode, currentMode) {
+  switch (errorCode) {
+    case "auth/email-already-in-use":
+      return "That email is already in use.";
+    case "auth/invalid-email":
+      return "That email address is invalid.";
+    case "auth/weak-password":
+      return "Password must be at least 6 characters.";
+    case "auth/invalid-credential":
+    case "auth/user-not-found":
+    case "auth/wrong-password":
+      return currentMode === "login"
+        ? "Incorrect email or password."
+        : "Could not create the account with those credentials.";
+    case "auth/too-many-requests":
+      return "Too many attempts. Please wait a bit and try again.";
+    case "auth/network-request-failed":
+      return "Network error. Check your connection and try again.";
+    case "auth/missing-password":
+      return "Please enter your password.";
+    default:
+      return "Something went wrong. Please try again.";
+  }
+}
+
+function getFriendlyResetMessage(errorCode) {
+  switch (errorCode) {
+    case "auth/invalid-email":
+      return "That email address is invalid.";
+    case "auth/user-not-found":
+      return "No account found with that email.";
+    case "auth/too-many-requests":
+      return "Too many reset attempts. Please wait a bit.";
+    case "auth/network-request-failed":
+      return "Network error. Check your connection and try again.";
+    default:
+      return "Could not send reset email. Please try again.";
+  }
+}
 
 onAuthStateChanged(auth, (user) => {
   if (user) {
@@ -64,13 +118,8 @@ onAuthStateChanged(auth, (user) => {
   }
 });
 
-// ---------------- MODE SWITCH ----------------
-
-showLoginBtn.addEventListener("click", () => setMode("login"));
-showSignupBtn.addEventListener("click", () => setMode("signup"));
-
-// ---------------- URL MODE SUPPORT ----------------
-// allows: login.html?mode=signup
+showLoginBtn?.addEventListener("click", () => setMode("login"));
+showSignupBtn?.addEventListener("click", () => setMode("signup"));
 
 const params = new URLSearchParams(window.location.search);
 const urlMode = params.get("mode");
@@ -79,15 +128,20 @@ if (urlMode === "signup") {
   setMode("signup");
 }
 
-// ---------------- FORM SUBMIT ----------------
-
-authForm.addEventListener("submit", async (event) => {
+authForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
+
+  if (authBusy) return;
 
   const { name, email, password } = getFormValues();
 
   if (!email || !password) {
     setMessage("Please enter your email and password.");
+    return;
+  }
+
+  if (!isValidEmail(email)) {
+    setMessage("Please enter a valid email address.");
     return;
   }
 
@@ -101,9 +155,8 @@ authForm.addEventListener("submit", async (event) => {
     return;
   }
 
-  submitBtn.disabled = true;
-  submitBtn.textContent =
-    mode === "signup" ? "Creating Account..." : "Logging In...";
+  setBusyState(true);
+  setMessage("");
 
   try {
     if (mode === "signup") {
@@ -115,6 +168,14 @@ authForm.addEventListener("submit", async (event) => {
 
       const user = userCredential.user;
 
+      try {
+        await updateProfile(user, {
+          displayName: name
+        });
+      } catch (profileError) {
+        console.error("Could not update display name:", profileError);
+      }
+
       await setDoc(doc(db, "users", user.uid), {
         name,
         email,
@@ -123,49 +184,23 @@ authForm.addEventListener("submit", async (event) => {
 
       setMessage("Account created successfully.", true);
       window.location.replace("dashboard.html");
-    } else {
-      await signInWithEmailAndPassword(auth, email, password);
-
-      setMessage("Logged in successfully.", true);
-      window.location.replace("dashboard.html");
+      return;
     }
+
+    await signInWithEmailAndPassword(auth, email, password);
+    setMessage("Logged in successfully.", true);
+    window.location.replace("dashboard.html");
   } catch (error) {
-    let friendlyMessage = "Something went wrong. Please try again.";
-
-    switch (error.code) {
-      case "auth/email-already-in-use":
-        friendlyMessage = "That email is already in use.";
-        break;
-      case "auth/invalid-email":
-        friendlyMessage = "That email address is invalid.";
-        break;
-      case "auth/weak-password":
-        friendlyMessage = "Password should be at least 6 characters.";
-        break;
-      case "auth/invalid-credential":
-      case "auth/user-not-found":
-      case "auth/wrong-password":
-        friendlyMessage = "Incorrect email or password.";
-        break;
-      case "auth/too-many-requests":
-        friendlyMessage = "Too many attempts. Please wait a bit.";
-        break;
-      default:
-        friendlyMessage = error.message;
-        break;
-    }
-
-    setMessage(friendlyMessage);
+    console.error("Authentication failed:", error);
+    setMessage(getFriendlyAuthMessage(error?.code, mode));
   } finally {
-    submitBtn.disabled = false;
-    submitBtn.textContent =
-      mode === "signup" ? "Create Account" : "Log In";
+    setBusyState(false);
   }
 });
 
-// ---------------- RESET PASSWORD ----------------
+forgotPasswordBtn?.addEventListener("click", async () => {
+  if (authBusy) return;
 
-forgotPasswordBtn.addEventListener("click", async () => {
   const email = emailInput.value.trim();
 
   if (!email) {
@@ -173,24 +208,21 @@ forgotPasswordBtn.addEventListener("click", async () => {
     return;
   }
 
+  if (!isValidEmail(email)) {
+    setMessage("Please enter a valid email address.");
+    return;
+  }
+
+  forgotPasswordBtn.disabled = true;
+  setMessage("");
+
   try {
     await sendPasswordResetEmail(auth, email);
     setMessage("Password reset email sent.", true);
   } catch (error) {
-    let friendlyMessage = "Could not send reset email.";
-
-    switch (error.code) {
-      case "auth/invalid-email":
-        friendlyMessage = "That email address is invalid.";
-        break;
-      case "auth/user-not-found":
-        friendlyMessage = "No account found with that email.";
-        break;
-      default:
-        friendlyMessage = error.message;
-        break;
-    }
-
-    setMessage(friendlyMessage);
+    console.error("Password reset failed:", error);
+    setMessage(getFriendlyResetMessage(error?.code));
+  } finally {
+    forgotPasswordBtn.disabled = false;
   }
 });

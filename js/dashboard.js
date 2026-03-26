@@ -113,6 +113,21 @@ function escapeHtml(value = "") {
   return div.innerHTML;
 }
 
+function sanitizeHttpUrl(value = "") {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+
+  try {
+    const url = new URL(trimmed);
+    if (url.protocol === "http:" || url.protocol === "https:") {
+      return url.toString();
+    }
+    return "";
+  } catch {
+    return "";
+  }
+}
+
 function getAppsRef() {
   return collection(db, "users", state.user.uid, "applications");
 }
@@ -228,6 +243,8 @@ function createCard(app) {
     badges.push(`<span class="badge ${followUpClass}">${followUpLabel}</span>`);
   }
 
+  const safeLink = sanitizeHttpUrl(app.link);
+
   card.innerHTML = `
     ${app.status === "offer" ? `<div class="offer-badge">${getOfferEmoji(app.offerResponse)}</div>` : ""}
     <div>
@@ -242,7 +259,7 @@ function createCard(app) {
     <div class="app-extra">
       ${app.location ? `<div>${escapeHtml(app.location)}</div>` : ""}
       ${app.dateApplied ? `<div>Applied: ${escapeHtml(app.dateApplied)}</div>` : ""}
-      ${app.link ? `<a class="app-link" href="${escapeHtml(app.link)}" target="_blank" rel="noopener noreferrer">Open posting</a>` : ""}
+      ${safeLink ? `<a class="app-link" href="${safeLink}" target="_blank" rel="noopener noreferrer">Open posting</a>` : ""}
       ${app.notes ? `<div>${escapeHtml(app.notes)}</div>` : ""}
     </div>
   `;
@@ -339,7 +356,8 @@ async function loadApplications() {
       title: data.title || data.role || "",
       status,
       priority: data.priority || "medium",
-      offerResponse: status === "offer" ? normalizeOfferResponse(data.offerResponse) : ""
+      offerResponse: status === "offer" ? normalizeOfferResponse(data.offerResponse) : "",
+      link: sanitizeHttpUrl(data.link || "")
     };
   });
 
@@ -373,7 +391,7 @@ async function saveApplication() {
       dateApplied: dateAppliedInput.value || "",
       nextFollowUp: nextFollowUpInput.value || "",
       location: locationInput.value.trim(),
-      link: linkInput.value.trim(),
+      link: sanitizeHttpUrl(linkInput.value),
       notes: notesInput.value.trim(),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
@@ -417,7 +435,7 @@ async function saveDrawerChanges() {
       dateApplied: drawerDateApplied.value || "",
       nextFollowUp: drawerNextFollowUp.value || "",
       location: drawerLocation.value.trim(),
-      link: drawerLink.value.trim(),
+      link: sanitizeHttpUrl(drawerLink.value),
       notes: drawerNotes.value.trim(),
       updatedAt: serverTimestamp()
     });
