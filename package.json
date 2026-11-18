@@ -1,0 +1,15 @@
+{
+  "name": "pipeline-local-rules-tests",
+  "version": "1.0.0",
+  "description": "Synthetic loopback-only Firestore rules regression tests",
+  "scripts": {
+    "test": "firebase emulators:exec --project demo-pipeline-rules --config firebase.emulator.json --only firestore \"node --test tests/firestore.rules.test.mjs\""
+  },
+  "type": "commonjs",
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^6.0.0",
+    "firebase": "^13.4.0",
+    "firebase-tools": "^15.36.0"
+  },
+  "private": true
+}
